@@ -126,7 +126,9 @@ fi
 
 function read_properties()
 {
-  file="mrenclaves.html"
+  file="mrenclaves.txt"
+  curl "https://sconedocs.github.io/txt/mrenclaves.txt" -o "$file"
+
   image="$1"
   while IFS="=" read -r key value; do
     if [[ "$key" == "$image" ]] ; then

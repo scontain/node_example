@@ -1,4 +1,4 @@
-name: NODE_SESSION-30386-12378-31478
+name: $NODE_SESSION
 version: "0.3"
 
 # Access control:
@@ -14,7 +14,7 @@ access_policy:
 services:
    - name: app
      image_name: node_image
-     mrenclaves: [e9744ef0e1123da5772b4440bc186c6bf19cad257d326215dfdf76cdb93c83d8]
+     mrenclaves: [$MRENCLAVE]
      command: node /app/app.js
      environment:
       SCONE_MODE: hw
