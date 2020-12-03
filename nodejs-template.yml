@@ -50,6 +50,11 @@ secrets:
 
 security:
   attestation:
-    tolerate: [debug-mode, hyperthreading, insecure-igpu, outdated-tcb]
-    ignore_advisories: ["INTEL-SA-00076", "INTEL-SA-00088", "INTEL-SA-00106", "INTEL-SA-00115", "INTEL-SA-00135", "INTEL-SA-00203", "INTEL-SA-00161", "INTEL-SA-00220", "INTEL-SA-00270", "INTEL-SA-00293", "INTEL-SA-00320", "INTEL-SA-00329", "INTEL-SA-00233", "INTEL-SA-00220", "INTEL-SA-00270", "INTEL-SA-00293", "INTEL-SA-00320", "INTEL-SA-00329"]
+    tolerate: [debug-mode, outdated-tcb]
+    ignore_advisories: "*"
+
+#security:
+#  attestation:
+#    tolerate: [debug-mode, hyperthreading, insecure-igpu, outdated-tcb]
+#    ignore_advisories: ["INTEL-SA-00076", "INTEL-SA-00088", "INTEL-SA-00106", "INTEL-SA-00115", "INTEL-SA-00135", "INTEL-SA-00203", "INTEL-SA-00161", "INTEL-SA-00220", "INTEL-SA-00270", "INTEL-SA-00293", "INTEL-SA-00320", "INTEL-SA-00329", "INTEL-SA-00233", "INTEL-SA-00220", "INTEL-SA-00270", "INTEL-SA-00293", "INTEL-SA-00320", "INTEL-SA-00329"]
 
