@@ -30,6 +30,41 @@ node_1  | Ok.
 
 indicating that the `app` is ready to process requests.
 
+## Run on an Azure Kubernetes Cluster
+
+To run on Azure Kubernetes Service (AKS) with Kubernetes, begin by setting up helm as we describe in [this documentation](https://sconedocs.github.io/helm/). Further, install the [SGX Plugin](https://sconedocs.github.io/helm_sgxdevplugin/) and the [SCONE LAS](https://sconedocs.github.io/helm_las/) as follows:
+```bash
+helm install sgxdevplugin sconeapps/sgxdevplugin
+helm install las sconeapps/las --set image=registry.scontain.com:5050/sconecuratedimages/services:las-scone4.2.1 --set useSGXDevPlugin=disabled
+```
+
+Continue by uploading a session, using the same scripts as before:
+```bash
+export CAS_ADDR="4-2-1.scone-cas.cf" # we use a public SCONE CAS to store the session policies
+export IMAGE="sconecuratedimages/apps:node-10.14-alpine-scone4.2.1"
+unset NODE_SESSION
+export NODE_SESSION=$(./upload_session --template=nodejs-template.yml --session=nodejs-session.yml  --image=$IMAGE --cas=$CAS_ADDR)
+```
+
+Now we can deploy the NodeJS example with:
+```bash
+helm install nodejs nodejs \
+        --set useSGXDevPlugin=azure \
+        --set sgxEpcMem=16 \
+        --set scone.attestation.ConfigID=$NODE_SESSION/app
+```
+
+To access the application, follow the instructions printed out upon deploying the helm chart:
+```bash
+# 1. Get the application URL by running these commands:
+export POD_NAME=$(kubectl get pods --namespace default -l "app.kubernetes.io/name=nodejs,app.kubernetes.io/instance=nodejs" -o jsonpath="{.items[0].metadata.name}")
+export CONTAINER_PORT=$(kubectl get pod --namespace default $POD_NAME -o jsonpath="{.spec.containers[0].ports[0].containerPort}")
+echo "Visit http://127.0.0.1:8080 to use your application"
+kubectl --namespace default port-forward $POD_NAME 8080:$CONTAINER_PORT
+```
+
+The following instructions can be followed analogous to running the service locally, with the exception of replacing the port `443` with the port `8080`.
+
 ## Client Request
 
 Execute client request via https:
@@ -80,4 +115,3 @@ Before restarting the service, please shut it down properly with `docker-compose
 
 You need to ensure that CAS executes inside of an enclave and was not manipulated. To do so, you would need to use
 our SCONE CLI to [attest CAS](https://sconedocs.github.io/helm_cas/#attesting-cas) and to [upload a session](https://sconedocs.github.io/CAS_cli/#createupdate-session-description)
-
