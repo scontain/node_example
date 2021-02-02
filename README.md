@@ -1,5 +1,58 @@
 # A simple node JS example
 
+## Run on an Azure Kubernetes Cluster
+
+To run on Azure Kubernetes Service (AKS) with Kubernetes, begin by setting up helm. You will require access to the SconeAppsEE repository.
+```bash
+export GH_TOKEN=...
+helm repo add sconeappsEE https://${GH_TOKEN}@raw.githubusercontent.com/scontain/SconeAppsEE/master/
+helm repo update
+```
+
+Now we continue by installing the [SCONE LAS](https://sconedocs.github.io/helm_las/). Be sure to set select the node you wish to use using the `nodeSelector`, analogous to this example:
+```bash
+# label the node we wish to use
+kubectl label nodes aks-confcompool1-32092211-vmss000000 sgx=target
+
+# install the LAS
+helm install las sconeappsEE/las \
+    --set useSGXDevPlugin=azure \
+    --set sgxEpcMem=16 \
+    --set nodeSelector.sgx=target \
+    --set image=registry.scontain.com:5050/sconecuratedimages/services:las-scone4.2.1
+```
+
+
+Continue by uploading a session, using the same scripts as before:
+```bash
+export CAS_ADDR="4-2-1.scone-cas.cf" # we use a public SCONE CAS to store the session policies
+export IMAGE="sconecuratedimages/apps:node-10.14-alpine-scone4.2.1"
+unset NODE_SESSION
+export NODE_SESSION=$(./upload_session --template=nodejs-template.yml --session=nodejs-session.yml  --image=$IMAGE --cas=$CAS_ADDR)
+```
+
+Now we can deploy the NodeJS example. Be sure to deploy it on the same node as your LAS:
+```bash
+helm install nodejs nodejs \
+        --set useSGXDevPlugin=azure \
+        --set sgxEpcMem=16 \
+        --set scone.attestation.ConfigID=$NODE_SESSION/app \
+        --set nodeSelector.sgx=target
+```
+
+To access the application, follow the instructions printed out upon deploying the helm chart:
+```bash
+# 1. Get the application URL by running these commands:
+export POD_NAME=$(kubectl get pods --namespace default -l "app.kubernetes.io/name=nodejs,app.kubernetes.io/instance=nodejs" -o jsonpath="{.items[0].metadata.name}")
+export CONTAINER_PORT=$(kubectl get pod --namespace default $POD_NAME -o jsonpath="{.spec.containers[0].ports[0].containerPort}")
+echo "Visit http://127.0.0.1:8080 to use your application"
+kubectl --namespace default port-forward $POD_NAME 8080:$CONTAINER_PORT
+```
+
+The **Client Request** instructions can be followed analogous to running the service locally, with the exception of replacing the port `443` with the port `8080`.
+
+## Run locally with Docker
+
 The application `app/app.js` shows how to inject keys and certificate in a node program.
 
 We require to set some environment variables:
@@ -29,41 +82,6 @@ node_1  | Ok.
 ```
 
 indicating that the `app` is ready to process requests.
-
-## Run on an Azure Kubernetes Cluster
-
-To run on Azure Kubernetes Service (AKS) with Kubernetes, begin by setting up helm as we describe in [this documentation](https://sconedocs.github.io/helm/). Further, install the [SGX Plugin](https://sconedocs.github.io/helm_sgxdevplugin/) and the [SCONE LAS](https://sconedocs.github.io/helm_las/) as follows:
-```bash
-helm install sgxdevplugin sconeapps/sgxdevplugin
-helm install las sconeapps/las --set image=registry.scontain.com:5050/sconecuratedimages/services:las-scone4.2.1 --set useSGXDevPlugin=disabled
-```
-
-Continue by uploading a session, using the same scripts as before:
-```bash
-export CAS_ADDR="4-2-1.scone-cas.cf" # we use a public SCONE CAS to store the session policies
-export IMAGE="sconecuratedimages/apps:node-10.14-alpine-scone4.2.1"
-unset NODE_SESSION
-export NODE_SESSION=$(./upload_session --template=nodejs-template.yml --session=nodejs-session.yml  --image=$IMAGE --cas=$CAS_ADDR)
-```
-
-Now we can deploy the NodeJS example with:
-```bash
-helm install nodejs nodejs \
-        --set useSGXDevPlugin=azure \
-        --set sgxEpcMem=16 \
-        --set scone.attestation.ConfigID=$NODE_SESSION/app
-```
-
-To access the application, follow the instructions printed out upon deploying the helm chart:
-```bash
-# 1. Get the application URL by running these commands:
-export POD_NAME=$(kubectl get pods --namespace default -l "app.kubernetes.io/name=nodejs,app.kubernetes.io/instance=nodejs" -o jsonpath="{.items[0].metadata.name}")
-export CONTAINER_PORT=$(kubectl get pod --namespace default $POD_NAME -o jsonpath="{.spec.containers[0].ports[0].containerPort}")
-echo "Visit http://127.0.0.1:8080 to use your application"
-kubectl --namespace default port-forward $POD_NAME 8080:$CONTAINER_PORT
-```
-
-The following instructions can be followed analogous to running the service locally, with the exception of replacing the port `443` with the port `8080`.
 
 ## Client Request
 
