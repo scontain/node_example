@@ -1,0 +1,117 @@
+{{- if not .Values.useSGXDevPlugin }}
+{{- required "A valid '.Values.useSGXDevPlugin' is required: \"enabled\"|\"scone\"|\"azure\"|\"disabled\"" .value }}
+{{- else if and (ne .Values.useSGXDevPlugin "enabled") (ne .Values.useSGXDevPlugin "scone") (ne .Values.useSGXDevPlugin "azure") (ne .Values.useSGXDevPlugin "disabled") }}
+{{- required "A valid '.Values.useSGXDevPlugin' is required: \"enabled\"|\"scone\"|\"azure\"|\"disabled\"" .value }}
+{{- end }}
+
+{{- if and (eq .Values.useSGXDevPlugin "azure") (not .Values.sgxEpcMem) }}
+{{- required "Specify '.Values.sgxEpcMem' when using Azure SGX Device Plugin" .value }}
+{{- end }}
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "nodejs.fullname" . }}
+  labels:
+    {{- include "nodejs.labels" . | nindent 4 }}
+spec:
+{{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+{{- end }}
+  selector:
+    matchLabels:
+      {{- include "nodejs.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+    {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+      labels:
+        {{- include "nodejs.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "nodejs.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- if .Values.securityContext }}
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          {{- end}}
+          {{- if or (eq .Values.useSGXDevPlugin "scone") (eq .Values.useSGXDevPlugin "enabled")}}
+            capabilities:
+              add: ["SYS_RAWIO"]
+          {{- else }}
+            privileged: true
+          {{- end}}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          command: [ "/bin/sh", "-c", "sleep 5; npm install express --save ; unset SCONE_NO_FS_SHIELD ; SCONE_CAS_ADDR={{ .Values.scone.attestation.cas }} SCONE_LAS_ADDR={{ .Values.scone.attestation.las }} SCONE_CONFIG_ID={{ .Values.scone.attestation.ConfigID }} node" ]
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 443
+              protocol: TCP
+          {{- if or (.Values.resources) (or (or (eq .Values.useSGXDevPlugin "scone") (eq .Values.useSGXDevPlugin "enabled")) (eq .Values.useSGXDevPlugin "azure")) }}
+          resources:
+          {{- if .Values.resources }}
+          {{- toYaml .Values.resources | nindent 12 }}
+          {{- end }}
+          {{- if or (eq .Values.useSGXDevPlugin "scone") (eq .Values.useSGXDevPlugin "enabled") }}
+            limits:
+              sgx.k8s.io/sgx: 1
+          {{- else if eq .Values.useSGXDevPlugin "azure" }}
+            limits:
+              kubernetes.azure.com/sgx_epc_mem_in_MiB: {{ .Values.sgxEpcMem }}
+          {{- end}}
+          {{- end}}
+          env:
+              {{- if .Values.scone.attestation.enabled }}
+            - name: SCONE_LAS_ADDR
+              {{- if .Values.scone.attestation.lasUseHostIP }}
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
+              {{- else }}
+              value: "{{ .Values.scone.attestation.las }}"
+              {{- end }}
+            - name: SCONE_CAS_ADDR
+              value: "{{ .Values.scone.attestation.cas }}"
+            - name: SCONE_CONFIG_ID
+              value: "{{ .Values.scone.attestation.ConfigID }}"
+              {{- end }}
+            {{- if .Values.scone.env }}
+              {{ toYaml .Values.scone.env | nindent 12 }}
+            {{- end }}
+            {{- if .Values.extraEnvVars }}
+              {{ toYaml .Values.extraEnvVars | nindent 12 }}
+            {{- end }}
+          {{- if eq .Values.useSGXDevPlugin "disabled" }}
+          volumeMounts:
+          {{- end }}
+          {{- if eq .Values.useSGXDevPlugin "disabled" }}
+            - name: dev-isgx
+              mountPath: /dev/isgx
+          {{- end }}
+      {{- if eq .Values.useSGXDevPlugin "disabled" }}
+      volumes:
+        - name: dev-isgx
+          hostPath:
+            path: /dev/isgx
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
