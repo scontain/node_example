@@ -17,7 +17,7 @@ kubectl label nodes aks-confcompool1-32092211-vmss000000 sgx=target
 # install the LAS
 helm install las sconeappsEE/las \
     --set useSGXDevPlugin=azure \
-    --set sgxEpcMem=16 \
+    --set sgxEpcMem=8 \
     --set nodeSelector.sgx=target \
     --set image=registry.scontain.com:5050/sconecuratedimages/services:las-scone4.2.1
 ```
@@ -35,7 +35,7 @@ Now we can deploy the NodeJS example. Be sure to deploy it on the same node as y
 ```bash
 helm install nodejs nodejs \
         --set useSGXDevPlugin=azure \
-        --set sgxEpcMem=16 \
+        --set sgxEpcMem=8 \
         --set scone.attestation.ConfigID=$NODE_SESSION/app \
         --set nodeSelector.sgx=target
 ```
@@ -48,8 +48,6 @@ export CONTAINER_PORT=$(kubectl get pod --namespace default $POD_NAME -o jsonpat
 echo "Visit http://127.0.0.1:8080 to use your application"
 kubectl --namespace default port-forward $POD_NAME 8080:$CONTAINER_PORT
 ```
-
-The **Client Request** instructions can be followed analogous to running the service locally, with the exception of replacing the port `443` with the port `8080`.
 
 ## Run locally with Docker
 
@@ -83,12 +81,14 @@ node_1  | Ok.
 
 indicating that the `app` is ready to process requests.
 
+The **Client Request** instructions can be followed analogous to running the service locally, with the exception of replacing the port `8080` with the port `443`.
+
 ## Client Request
 
 Execute client request via https:
 
 ```bash
-curl -k https://localhost:443
+curl -k https://localhost:8080
 ```
 
 The output will be:
@@ -100,7 +100,7 @@ Hello World!Hello NodeJS
 Note that '-k' is the insecure mode and if we drop this option, the output will look like this:
 
 ```txt
-curl https://localhost:443
+curl https://localhost:8080
 
 curl: (60) SSL certificate problem: unable to get local issuer certificate
 More details here: https://curl.haxx.se/docs/sslcerts.html
@@ -123,7 +123,7 @@ printf "\n$ca_cert" > ca_cert
 ```
 
 ```bash
-curl --capath "$(pwd)" --cacert ca_cert --verbose https://app:443 --resolve app:443:127.0.0.1
+curl --capath "$(pwd)" --cacert ca_cert --verbose https://app:8080 --resolve app:8080:127.0.0.1
 ```
 
 
